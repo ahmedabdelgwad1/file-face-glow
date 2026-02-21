@@ -71,3 +71,35 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Integrated Plant Diagnosis Backend
+
+This repo is now wired to a Python backend that runs:
+- Local Keras model prediction (`plant_disease_model2.keras` / `plant_disease_model.keras`)
+- Optional Groq enhancement
+- Final fused diagnosis
+
+### 1) Run backend
+
+From workspace root (`/Users/apple/Desktop/plant4`):
+
+```sh
+pip install -r file-face-glow/backend/requirements.txt
+uvicorn file-face-glow.backend.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2) Run frontend
+
+From `file-face-glow/`:
+
+```sh
+npm i
+npm run dev
+```
+
+Frontend calls backend at `http://127.0.0.1:8000` by default.
+To change it, set:
+
+```sh
+VITE_API_BASE_URL=http://your-host:8000
+```

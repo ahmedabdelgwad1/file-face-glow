@@ -7,26 +7,26 @@ import DiagnosisCard from "@/components/DiagnosisCard";
 import { Language, TEXT } from "@/lib/i18n";
 import heroLeaves from "@/assets/hero-leaves.jpg";
 
-// Simulated results for demo
-const MOCK_LOCAL_RESULT = {
-  label: "Tomato___Late_blight",
-  confidence: 87.4,
-  source: "",
-  isHealthy: false,
+type DiagnosisResult = {
+  label: string;
+  confidence: number;
+  source: string;
+  reasoning?: string;
+  careSteps?: string[];
+  isHealthy?: boolean;
 };
 
-const MOCK_GROQ_RESULT = {
-  label: "Tomato___Late_blight",
-  confidence: 92.1,
-  source: "",
-  reasoning: "The leaf shows irregular dark brown lesions with a water-soaked appearance and white fuzzy growth on the undersides, characteristic of Phytophthora infestans infection.",
-  careSteps: [
-    "Remove and destroy all infected leaves immediately",
-    "Apply copper-based fungicide as a preventive measure",
-    "Ensure proper air circulation between plants",
-  ],
-  isHealthy: false,
+type DiagnoseApiResponse = {
+  local: DiagnosisResult;
+  enhanced?: DiagnosisResult | null;
+  final: DiagnosisResult;
+  meta?: {
+    groqModel?: string;
+    groqAvailable?: boolean;
+  };
 };
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 const Index = () => {
   const [lang, setLang] = useState<Language | null>(null);
@@ -34,26 +34,67 @@ const Index = () => {
   const [preview, setPreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [localResult, setLocalResult] = useState<DiagnosisResult | null>(null);
+  const [finalResult, setFinalResult] = useState<DiagnosisResult | null>(null);
+  const [enhancedResult, setEnhancedResult] = useState<DiagnosisResult | null>(null);
 
   const handleImageSelect = useCallback((file: File, previewUrl: string) => {
     setImageFile(file);
     setPreview(previewUrl);
     setShowResults(false);
+    setError(null);
+    setLocalResult(null);
+    setFinalResult(null);
+    setEnhancedResult(null);
   }, []);
 
   const handleRemove = useCallback(() => {
     setImageFile(null);
     setPreview(null);
     setShowResults(false);
+    setError(null);
+    setLocalResult(null);
+    setFinalResult(null);
+    setEnhancedResult(null);
   }, []);
 
-  const handleAnalyze = useCallback(() => {
+  const handleAnalyze = useCallback(async () => {
+    if (!imageFile || !lang) return;
     setIsAnalyzing(true);
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", imageFile);
+      const response = await fetch(`${API_BASE}/api/diagnose?lang=${lang}`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        let detail = "Failed to analyze image.";
+        try {
+          const err = await response.json();
+          detail = err?.detail || detail;
+        } catch {
+          // ignore json parsing errors
+        }
+        throw new Error(detail);
+      }
+
+      const payload: DiagnoseApiResponse = await response.json();
+      setLocalResult(payload.local);
+      setFinalResult(payload.final);
+      setEnhancedResult(payload.enhanced ?? null);
       setShowResults(true);
-    }, 2000);
-  }, []);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      setError(msg);
+      setShowResults(false);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [imageFile, lang]);
 
   if (!lang) {
     return <LanguageSelect onSelect={setLang} />;
@@ -61,13 +102,6 @@ const Index = () => {
 
   const t = TEXT[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
-
-  const localResult = { ...MOCK_LOCAL_RESULT, source: t.source_local };
-  const fusedResult = {
-    ...MOCK_GROQ_RESULT,
-    source: t.source_fused,
-    confidence: 89.3,
-  };
 
   return (
     <div dir={dir} className="min-h-screen bg-background">
@@ -189,23 +223,33 @@ const Index = () => {
               animate={{ opacity: 1 }}
               className="space-y-5"
             >
-              <DiagnosisCard
-                title={t.final_title}
-                result={fusedResult}
-                t={t}
-                variant="final"
-                delay={0}
-              />
-              <DiagnosisCard
-                title={t.enh_title}
-                result={MOCK_GROQ_RESULT}
-                t={t}
-                variant="enhanced"
-                delay={0.3}
-              />
+              {finalResult && (
+                <DiagnosisCard
+                  title={t.final_title}
+                  result={finalResult}
+                  t={t}
+                  variant="final"
+                  delay={0}
+                />
+              )}
+              {enhancedResult && (
+                <DiagnosisCard
+                  title={t.enh_title}
+                  result={enhancedResult}
+                  t={t}
+                  variant="enhanced"
+                  delay={0.3}
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>
+
+        {error && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3 text-sm">
+            {error}
+          </div>
+        )}
       </section>
     </div>
   );
