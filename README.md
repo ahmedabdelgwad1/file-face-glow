@@ -103,3 +103,22 @@ To change it, set:
 ```sh
 VITE_API_BASE_URL=http://your-host:8000
 ```
+
+## Deploy to Hugging Face Spaces (Docker)
+
+This project is ready for a single-container deployment (frontend + backend together).
+
+### Steps
+
+1. Create a new **Space** on Hugging Face.
+2. Choose **Docker** SDK.
+3. Push this `file-face-glow` folder to that Space repository.
+4. In Space settings, add Secrets/Variables:
+   - `GROQ_API_KEY` (optional)
+   - `GROQ_VISION_MODEL` (optional)
+   - `GROQ_EXTRA_PROMPT` (optional)
+
+The app runs on port `7860` inside the container and serves:
+- Frontend at `/`
+- API at `/api/diagnose`
+- Health check at `/health`

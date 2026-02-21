@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
@@ -168,6 +170,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+FRONTEND_DIST_DIR = BASE_DIR / "frontend_dist"
+if FRONTEND_DIST_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST_DIR / "assets")), name="assets")
+
 
 @app.get("/health")
 def health():
@@ -276,3 +282,21 @@ async def diagnose(file: UploadFile = File(...), lang: str = "en"):
         "final": final_result,
         "meta": {"groqModel": groq_model, "groqAvailable": bool(groq_key)},
     }
+
+
+@app.get("/")
+def serve_spa_root():
+    index_file = FRONTEND_DIST_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    raise HTTPException(status_code=404, detail="Frontend build not found.")
+
+
+@app.get("/{full_path:path}")
+def serve_spa_fallback(full_path: str):
+    if full_path.startswith("api/") or full_path.startswith("health"):
+        raise HTTPException(status_code=404, detail="Not found")
+    index_file = FRONTEND_DIST_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    raise HTTPException(status_code=404, detail="Frontend build not found.")
